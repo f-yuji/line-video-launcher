@@ -1,0 +1,17 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+
+audio/
+output/
+subtitles/
+logs/
+
+raw/
+
+.pytest_cache/
+.mypy_cache/
+
+.claude/
+.claude/

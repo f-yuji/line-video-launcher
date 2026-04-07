@@ -1,0 +1,143 @@
+LINE発信ランチャー 使い方ガイド
+全体の流れ
+
+①登録  →  ②生成  →  ③承認  →  ④投稿
+(LINE)    (自動)    (LINE)    (自動)
+初期セットアップ（初回のみ）
+1. Pythonライブラリのインストール
+
+cd C:\Users\f-yuj\dev\line_video_launcher
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+2. ffmpegのインストール
+ffmpeg公式 からDLして、PATHが通った場所に置く。
+
+確認コマンド:
+
+
+ffmpeg -version
+3. .envファイルの作成
+.env.example をコピーして .env を作り、各APIキーを記入する。
+
+
+LINE_CHANNEL_ACCESS_TOKEN=xxxx
+LINE_CHANNEL_SECRET=xxxx
+SUPABASE_URL=xxxx
+SUPABASE_KEY=xxxx
+OPENAI_API_KEY=xxxx
+ELEVENLABS_API_KEY=xxxx
+ELEVENLABS_VOICE_ID=xxxx
+X_API_KEY=xxxx
+...
+4. Supabaseにテーブルを作成
+Supabase ダッシュボード → SQL Editor → schema.sql の中身を貼り付けて実行。
+
+5. 素材動画を配置
+
+C:\Users\f-yuj\dev\line_video_launcher\raw\
+  └── 任意の動画ファイル（.mp4 / .mov など）を1本以上
+横型でも縦型でも可。自動で中央クロップして縦型（1080×1920）に変換される。
+
+同じ素材を何回使い回してもOK。差し替えはこのフォルダを入れ替えるだけ。
+
+6. YouTube OAuthトークン取得
+Google Cloud Console でOAuth2クライアントIDを作成後、以下を実行:
+
+
+python -c "
+from google_auth_oauthlib.flow import InstalledAppFlow
+flow = InstalledAppFlow.from_client_secrets_file('client_secret.json',
+    ['https://www.googleapis.com/auth/youtube.upload'])
+creds = flow.run_local_server(port=0)
+print(creds.refresh_token)
+"
+出力されたトークンを .env の YOUTUBE_REFRESH_TOKEN に貼る。
+
+7. サーバー起動 + ngrok
+
+# ターミナル1: アプリ起動
+python app.py
+
+# ターミナル2: ngrokでトンネル
+ngrok http 5001
+ngrokで表示された https://xxxx.ngrok.io/callback を
+
+LINE Developers → Webhook URL に設定する。
+
+日常の使い方（LINEコマンド）
+ネタを登録する
+
+登録: ネタの内容をここに書く
+例:
+
+
+登録: 猫がなぜ高いところが好きなのか、意外な理由3選
+DBに保存され「draft」状態になる。複数まとめて登録してOK。
+
+動画を生成する
+
+生成
+draft状態のネタを全件まとめて処理開始。
+
+LINEにすぐ「生成開始」と返信が来て、完了したらpush通知が届く。
+
+裏側でやっていること: 台本生成 → 投稿文生成 → 音声生成 → 字幕生成 → 動画生成
+
+完了後、output/ フォルダに動画が出力される。
+
+生成した動画を承認する
+完了通知に投稿IDが書かれているので:
+
+
+承認: {投稿ID}
+例:
+
+
+承認: abc123-xxxx-xxxx
+ready → approved に変わる。「投稿」コマンドはapprovedのものだけ対象。
+
+投稿する
+
+投稿
+approved状態のものを全件まとめて投稿処理開始。
+
+X・YouTubeは自動投稿。TikTok・Instagramは手動投稿用のテキストをDBに保存。
+
+ステータスの遷移
+
+draft
+  ↓「生成」コマンド
+generating（処理中）
+  ↓ 完了
+ready（動画できた）
+  ↓「承認: {id}」コマンド
+approved（投稿許可済み）
+  ↓「投稿」コマンド
+posting（投稿中）
+  ↓ 完了
+posted
+
+※ どこかで失敗すると → error（理由はDBのerror_messageに記録）
+フォルダ構成
+
+line_video_launcher/
+├── raw/         ← 素材動画を置く（手動で差し替え）
+├── audio/       ← 生成された音声（post_{id}_audio.mp3）
+├── subtitles/   ← 生成された字幕（post_{id}_subtitle.srt）
+├── output/      ← 完成動画（post_{id}_video.mp4）
+└── logs/        ← 各モジュールのログ
+TikTok・Instagramへの投稿
+自動投稿には対応していない。
+
+Supabaseの posts テーブルで対象レコードを開き、tiktok_text / instagram_text の文面をコピーして手動投稿する。
+
+動画ファイルは output/post_{id}_video.mp4 を使う。
+
+トラブルシューティング
+症状	確認場所
+生成が完了しない	logs/worker.log
+動画が出力されない	logs/video_processor.log
+LINE通知が届かない	logs/notifier.log
+X/YouTube投稿が失敗	DBの platform_status_x / platform_status_youtube
+エラーの詳細	DBの error_message カラム
