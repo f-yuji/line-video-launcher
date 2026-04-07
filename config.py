@@ -26,6 +26,10 @@ SUPABASE_KEY = _require("SUPABASE_KEY")
 # OpenAI
 OPENAI_API_KEY = _optional("OPENAI_API_KEY")
 
+# Gemini
+GEMINI_API_KEY = _optional("GEMINI_API_KEY")
+GEMINI_MODEL_ID = os.environ.get("GEMINI_MODEL_ID", "gemini-2.5-flash-lite")
+
 # ElevenLabs
 ELEVENLABS_API_KEY = _optional("ELEVENLABS_API_KEY")
 ELEVENLABS_VOICE_ID = _optional("ELEVENLABS_VOICE_ID")

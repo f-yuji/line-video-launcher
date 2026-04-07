@@ -9,7 +9,7 @@ from typing import Optional
 
 import db
 import notifier
-import script_generator_v2 as script_generator
+import script_generator_v7 as script_generator
 import caption_generator
 import voice_generator_v2 as voice_generator
 import subtitle_generator_v2 as subtitle_generator
