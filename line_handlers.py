@@ -38,14 +38,7 @@ def handle_message(user_id: str, text: str) -> str:
     if stripped.startswith(_PREFIX_APPROVE):
         return _handle_approve(user_id, stripped)
 
-    # ── その他 ──
-    return (
-        "コマンド一覧:\n"
-        "・登録: ネタ内容\n"
-        "・生成\n"
-        "・投稿\n"
-        "・承認: {投稿ID}"
-    )
+    return _handle_quick_generate(user_id, stripped)
 
 
 # ──────────────────────────────────────────────
@@ -59,6 +52,29 @@ def _handle_register(user_id: str, text: str) -> str:
     post = db.create_post(user_id, raw_text)
     logger.info(f"[handler] registered post_id={post['id']}")
     return f"ネタを登録しました！\n投稿ID: {post['id']}\nステータス: draft"
+
+
+def _handle_quick_generate(user_id: str, raw_text: str) -> str:
+    if not raw_text:
+        return (
+            "ネタをそのまま送れば自動で生成する。\n"
+            "投稿や承認だけコマンドで使う形。"
+        )
+
+    post = db.create_post(user_id, raw_text)
+    if not db.claim_post_for_generation(post["id"]):
+        logger.info(
+            f"[handler] quick generate skipped post_id={post['id']} (already claimed)"
+        )
+        return "生成対象はすでに処理開始済みだった。少し待ってから見て。"
+
+    worker.enqueue_generation(post)
+    logger.info(f"[handler] quick generated post_id={post['id']}")
+    return (
+        f"受け付けた。\n"
+        f"投稿ID: {post['id']}\n"
+        f"このまま生成を回してる。"
+    )
 
 
 def _handle_generate(user_id: str) -> str:

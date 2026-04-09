@@ -65,6 +65,12 @@ def generate_voice(post_id: str, text: str) -> str:
     if config.VOICE_LEAD_IN_SECONDS > 0:
         _add_lead_in_silence(out_path, config.VOICE_LEAD_IN_SECONDS)
 
+    if abs(config.VOICE_PLAYBACK_SPEED - 1.0) > 0.001:
+        _adjust_playback_speed(out_path, config.VOICE_PLAYBACK_SPEED)
+
+    if config.END_PADDING_SECONDS > 0:
+        _add_tail_silence(out_path, config.END_PADDING_SECONDS)
+
     logger.info(f"[generate_voice] saved to {out_path}")
     return out_path
 
@@ -94,6 +100,73 @@ def _add_lead_in_silence(audio_path: str, silence_seconds: float) -> None:
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg silence prepend failed: {result.stderr[-500:]}")
+
+    import os
+    os.replace(temp_path, audio_path)
+
+
+def _adjust_playback_speed(audio_path: str, speed: float) -> None:
+    temp_path = f"{audio_path}.speed.mp3"
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        audio_path,
+        "-filter:a",
+        _build_atempo_filter(speed),
+        "-c:a",
+        "libmp3lame",
+        "-q:a",
+        "2",
+        temp_path,
+    ]
+    logger.info(f"[generate_voice] adjusting playback speed to {speed:.3f}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg atempo failed: {result.stderr[-500:]}")
+
+    import os
+    os.replace(temp_path, audio_path)
+
+
+def _build_atempo_filter(speed: float) -> str:
+    remaining = speed
+    parts: list[str] = []
+    while remaining > 2.0:
+        parts.append("atempo=2.0")
+        remaining /= 2.0
+    while remaining < 0.5:
+        parts.append("atempo=0.5")
+        remaining /= 0.5
+    parts.append(f"atempo={remaining:.3f}")
+    return ",".join(parts)
+
+
+def _add_tail_silence(audio_path: str, silence_seconds: float) -> None:
+    temp_path = f"{audio_path}.tail.mp3"
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        audio_path,
+        "-f",
+        "lavfi",
+        "-i",
+        f"anullsrc=r=44100:cl=mono:d={silence_seconds}",
+        "-filter_complex",
+        "[0:a][1:a]concat=n=2:v=0:a=1[aout]",
+        "-map",
+        "[aout]",
+        "-c:a",
+        "libmp3lame",
+        "-q:a",
+        "2",
+        temp_path,
+    ]
+    logger.info(f"[generate_voice] adding tail silence {silence_seconds:.2f}s")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg tail silence failed: {result.stderr[-500:]}")
 
     import os
     os.replace(temp_path, audio_path)

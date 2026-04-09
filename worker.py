@@ -9,11 +9,11 @@ from typing import Optional
 
 import db
 import notifier
-import script_generator_v7 as script_generator
-import caption_generator
+import script_generator_v13 as script_generator
+import caption_generator_v2 as caption_generator
 import voice_generator_v2 as voice_generator
-import subtitle_generator_v2 as subtitle_generator
-import video_processor_safe as video_processor
+import subtitle_generator_v4 as subtitle_generator
+import video_processor_v2 as video_processor
 import poster_x
 import poster_youtube
 from utils import setup_logger, ensure_dirs
@@ -57,7 +57,12 @@ def _run_generation(post: dict) -> None:
         # 動画生成
         step = "video"
         logger.info(f"[worker] [{post_id}] processing video")
-        video_path = video_processor.process_video(post_id, audio_path, subtitle_path)
+        video_path = video_processor.process_video(
+            post_id,
+            audio_path,
+            subtitle_path,
+            hook_text=display_script.splitlines()[0] if display_script.splitlines() else "",
+        )
 
         # DB 更新
         step = "db_update"

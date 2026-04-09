@@ -1,7 +1,7 @@
 import argparse
 
-import caption_generator
-import script_generator_v7 as script_generator
+import caption_generator_v2 as caption_generator
+import script_generator_v13 as script_generator
 
 
 def main() -> None:

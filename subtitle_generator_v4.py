@@ -1,7 +1,7 @@
 import config
 from utils import format_srt_time, get_audio_duration, setup_logger, subtitle_path_for
 
-logger = setup_logger("subtitle_generator_v2")
+logger = setup_logger("subtitle_generator_v4")
 
 
 def generate_srt(post_id: str, script: str, audio_path: str) -> str:
@@ -28,8 +28,7 @@ def _build_srt(lines: list[str], total_duration: float) -> str:
     usable_duration = max(total_duration - lead_in, 0.8 * len(lines))
     weights = [_line_weight(line) for line in lines]
     if weights:
-        first_line_bonus = max(lead_in * 2.0, 6.0)
-        weights[0] += int(round(first_line_bonus))
+        weights[0] += int(round(max(lead_in * 2.0, 6.0)))
     total_weight = sum(weights)
     elapsed = 0.0
     blocks = []
@@ -42,9 +41,6 @@ def _build_srt(lines: list[str], total_duration: float) -> str:
             end = max(start + 0.8, total_duration - 0.1)
 
         display_line = _wrap_subtitle_line(line)
-        if i == 0:
-            display_line = _style_hook_line(_wrap_hook_line(line))
-
         blocks.append(
             f"{i + 1}\n"
             f"{format_srt_time(start)} --> {format_srt_time(end)}\n"
@@ -73,7 +69,7 @@ def _wrap_subtitle_line(text: str, max_chars: int = 14) -> str:
         return text
 
     split_at = max_chars
-    for marker in ("、", "。", "？", "！", " ", "　"):
+    for marker in ("、", "。", " ", "・"):
         pos = text.rfind(marker, 0, max_chars + 1)
         if pos > 0:
             split_at = pos + 1
@@ -84,36 +80,3 @@ def _wrap_subtitle_line(text: str, max_chars: int = 14) -> str:
     if len(second) > max_chars:
         second = second[:max_chars].strip()
     return f"{first}\n{second}"
-
-
-def _style_hook_line(text: str) -> str:
-    return "{\\an5\\fs22\\bord6\\shad1\\1c&H003CFF\\3c&H000000&\\4c&HFF000000&}" + text
-
-
-def _wrap_hook_line(text: str) -> str:
-    text = text.strip()
-    if not text:
-        return text
-
-    # 冒頭フックはサムネっぽく大きく見せたいので、通常字幕より細かく改行する
-    compact = text.replace("、", "").replace("。", "").replace("！", "").replace("？", "")
-    parts: list[str] = []
-    cursor = 0
-    max_chars = 7
-    while cursor < len(compact):
-        next_cursor = min(cursor + max_chars, len(compact))
-        parts.append(compact[cursor:next_cursor])
-        cursor = next_cursor
-
-    if len(parts) > 4:
-        merged = []
-        i = 0
-        while i < len(parts):
-            if i == len(parts) - 1:
-                merged.append(parts[i])
-            else:
-                merged.append(parts[i] + parts[i + 1])
-            i += 2
-        parts = merged
-
-    return "\\N".join(parts[:4])
