@@ -60,12 +60,16 @@ def pick_raw_video() -> str:
 
 
 def _download_raw_video(url: str) -> str:
-    """RAW_VIDEO_URL から素材動画をダウンロードして raw/ に保存する"""
+    """RAW_VIDEO_URL / RAW_SE_URL からファイルをダウンロードして raw/ に保存する"""
     import urllib.request
+    import urllib.parse
 
     os.makedirs(config.RAW_DIR, exist_ok=True)
-    filename = url.split("?")[0].split("/")[-1] or "raw.mp4"
-    dest = os.path.join(config.RAW_DIR, filename)
+    # URL エンコードを除去して安全なファイル名にする
+    raw_name = urllib.parse.unquote(url.split("?")[0].split("/")[-1])
+    # スペース・括弧をアンダースコアに置換
+    safe_name = re.sub(r"[\s\(\)\[\]]+", "_", raw_name) or "raw_file"
+    dest = os.path.join(config.RAW_DIR, safe_name)
 
     if os.path.exists(dest):
         logger.info(f"[pick_raw_video] using cached {dest}")
