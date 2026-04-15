@@ -16,9 +16,15 @@ HOOK_LINE3_COLOR = (235, 20, 0, 255)
 STROKE_COLOR = (0, 0, 0, 255)
 
 FONT_CANDIDATES = [
+    # Windows
     r"C:\Windows\Fonts\YuGothB.ttc",
     r"C:\Windows\Fonts\meiryob.ttc",
     r"C:\Windows\Fonts\meiryo.ttc",
+    # Linux (Noto CJK — fonts-noto-cjk パッケージ)
+    "/usr/share/fonts/opentype/noto/NotoSansCJKjp-Bold.otf",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+    "/usr/share/fonts/noto-cjk/NotoSansCJKjp-Bold.otf",
+    "/usr/share/fonts/noto-cjk/NotoSansCJK-Bold.ttc",
 ]
 
 HOOK_MAX_TEXT_WIDTH = 940

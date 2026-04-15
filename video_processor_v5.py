@@ -12,7 +12,7 @@ OUTPUT_WIDTH = 1080
 OUTPUT_HEIGHT = 1920
 
 _SUBTITLE_STYLE = (
-    "FontName=Yu Gothic,"
+    "FontName=Noto Sans CJK JP,"
     "FontSize=14,"
     "PrimaryColour=&H00FFFFFF,"
     "OutlineColour=&H00000000,"
@@ -29,12 +29,12 @@ _SUBTITLE_STYLE = (
 )
 
 _HOOK_STYLE_LINE = (
-    "Style: Hook,Yu Gothic,138,&H0000A5FF,&H0000A5FF,&H00000000,&HEE000000,"
+    "Style: Hook,Noto Sans CJK JP,138,&H0000A5FF,&H0000A5FF,&H00000000,&HEE000000,"
     "-1,0,0,0,100,100,0,0,4,3,0,5,40,40,260,1\n"
 )
 
 _CTA_STYLE_LINE = (
-    "Style: Cta,Yu Gothic,124,&H00FFFFFF,&H00FFFFFF,&H00000000,&HFF000000,"
+    "Style: Cta,Noto Sans CJK JP,124,&H00FFFFFF,&H00FFFFFF,&H00000000,&HFF000000,"
     "-1,0,0,0,100,100,0,0,4,2,0,5,80,80,0,1\n"
 )
 

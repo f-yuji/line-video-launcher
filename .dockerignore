@@ -1,0 +1,24 @@
+.env
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.log
+
+# 生成ファイル（コンテナ内で再生成される）
+raw/
+audio/
+subtitles/
+output/
+thumbnails/
+logs/
+
+# 開発用スクリプト・テスト
+local_generate.py
+simulate_line.py
+test_full.py
+test_post.py
+get_youtube_token.py
+
+# OAuth クレデンシャル（Render の環境変数で渡す）
+client_secret*.json

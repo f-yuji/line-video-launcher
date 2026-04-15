@@ -7,12 +7,43 @@ logger = setup_logger("notifier")
 
 _PUSH_URL = "https://api.line.me/v2/bot/message/push"
 
-def _quick_reply_items(post_id: str) -> list[dict]:
-    return [
-        {"type": "action", "action": {"type": "message", "label": "✅ 投稿する", "text": f"投稿: {post_id}"}},
-        {"type": "action", "action": {"type": "message", "label": "🔄 再生成", "text": f"再生成: {post_id}"}},
-        {"type": "action", "action": {"type": "message", "label": "#️⃣ タグ再生成", "text": f"タグ再生成: {post_id}"}},
-    ]
+def _action_buttons_flex(post_id: str) -> dict:
+    """投稿操作ボタンを Flex Message バブルで返す（チャットに残る）"""
+    def _btn(label: str, text: str, color: str) -> dict:
+        return {
+            "type": "button",
+            "style": "primary",
+            "color": color,
+            "margin": "sm",
+            "action": {"type": "message", "label": label, "text": text},
+        }
+
+    return {
+        "type": "flex",
+        "altText": f"操作ボタン: {post_id}",
+        "contents": {
+            "type": "bubble",
+            "size": "kilo",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "paddingAll": "lg",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": post_id,
+                        "size": "xs",
+                        "color": "#aaaaaa",
+                        "margin": "none",
+                    },
+                    _btn("✅ 投稿する",    f"投稿: {post_id}",    "#27ACB2"),
+                    _btn("🔄 再生成",      f"再生成: {post_id}",  "#555555"),
+                    _btn("#️⃣ タグ再生成", f"タグ再生成: {post_id}", "#888888"),
+                ],
+            },
+        },
+    }
 
 
 def _headers() -> dict:
@@ -37,11 +68,8 @@ def _push_messages(user_id: str, messages: list[dict]) -> None:
         logger.info(f"[notifier] pushed {len(messages)} msg(s) to {user_id}")
 
 
-def _text_msg(text: str, post_id: str | None = None) -> dict:
-    msg: dict = {"type": "text", "text": text}
-    if post_id:
-        msg["quickReply"] = {"items": _quick_reply_items(post_id)}
-    return msg
+def _text_msg(text: str) -> dict:
+    return {"type": "text", "text": text}
 
 
 def _video_msg(video_url: str, preview_url: str) -> dict:
@@ -93,11 +121,14 @@ def notify_generation_complete_with_content(
     _push_messages(user_id, [
         _text_msg(f"【Instagram】\n{instagram_text}"),
         _text_msg(f"【TikTok】\n{tiktok_text}"),
-        _text_msg(f"【HASHTAGS】\n{hashtags}", post_id=post_id),
+        _text_msg(f"【HASHTAGS】\n{hashtags}"),
     ])
 
     # 5通目: 動画
     _send_video(user_id, video_path, post_id)
+
+    # 6通目: 操作ボタン（Flex Message で常に残る）
+    _push_messages(user_id, [_action_buttons_flex(post_id)])
 
     logger.info(f"[notifier] sent content to {user_id} post_id={post_id}")
 
