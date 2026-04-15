@@ -1,4 +1,5 @@
 import config
+from display_formatter import format_subtitle
 from utils import format_srt_time, get_audio_duration, setup_logger, subtitle_path_for
 
 logger = setup_logger("subtitle_generator_v4")
@@ -40,7 +41,7 @@ def _build_srt(lines: list[str], total_duration: float) -> str:
         if i == len(lines) - 1:
             end = max(start + 0.8, total_duration - 0.1)
 
-        display_line = "" if i == 0 else _wrap_subtitle_line(line)
+        display_line = "" if i == 0 else format_subtitle(line)
         blocks.append(
             f"{i + 1}\n"
             f"{format_srt_time(start)} --> {format_srt_time(end)}\n"
@@ -63,20 +64,3 @@ def _line_weight(line: str) -> int:
     return max(weight, 1)
 
 
-def _wrap_subtitle_line(text: str, max_chars: int = 14) -> str:
-    text = text.strip()
-    if len(text) <= max_chars:
-        return text
-
-    split_at = max_chars
-    for marker in ("、", "。", " ", "・"):
-        pos = text.rfind(marker, 0, max_chars + 1)
-        if pos > 0:
-            split_at = pos + 1
-            break
-
-    first = text[:split_at].strip()
-    second = text[split_at:].strip()
-    if len(second) > max_chars:
-        second = second[:max_chars].strip()
-    return f"{first}\n{second}"

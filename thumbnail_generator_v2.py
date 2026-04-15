@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from display_formatter import format_hook_lines
 from utils import cta_image_path_for, hook_image_path_for, setup_logger
 
 logger = setup_logger("thumbnail_generator_v2")
@@ -21,32 +22,6 @@ FONT_CANDIDATES = [
 ]
 
 HOOK_MAX_TEXT_WIDTH = 940
-HOOK_IMPACT_SUFFIXES = [
-    "地獄です",
-    "損します",
-    "危険です",
-    "終わりです",
-    "詰みます",
-    "地獄",
-    "危険",
-    "詰む",
-    "破滅",
-    "終了",
-    "無理",
-    "損",
-    "ない",
-]
-
-HOOK_MIDDLE_PHRASES = [
-    "書類なくすと",
-    "だけで安心は",
-    "知らないと",
-    "なくすと",
-    "資産では",
-    "意味がない",
-    "現金一括",
-    "値上がりで",
-]
 
 
 def generate_hook_image(post_id: str, text: str) -> str | None:
@@ -55,13 +30,16 @@ def generate_hook_image(post_id: str, text: str) -> str | None:
         return None
 
     Image, ImageDraw, ImageFont = _load_pillow()
-    lines = _split_into_lines(text)
-    if len(lines) == 1:
-        lines = [lines[0], "", ""]
-    elif len(lines) == 2:
-        lines = [lines[0], lines[1], ""]
-    elif len(lines) > 3:
-        lines = [lines[0], "".join(lines[1:-1]), lines[-1]]
+    raw_lines = format_hook_lines(text)
+    # 必ず3要素に正規化
+    if len(raw_lines) == 1:
+        lines = [raw_lines[0], "", ""]
+    elif len(raw_lines) == 2:
+        lines = [raw_lines[0], raw_lines[1], ""]
+    elif len(raw_lines) > 3:
+        lines = [raw_lines[0], "".join(raw_lines[1:-1]), raw_lines[-1]]
+    else:
+        lines = raw_lines
 
     image = Image.new("RGBA", (WIDTH, HEIGHT), BACKGROUND)
     draw = ImageDraw.Draw(image)
@@ -181,135 +159,3 @@ def _fit_font(ImageFont, draw, text: str, start_size: int, max_width: int, strok
     return _pick_font(ImageFont, 72)
 
 
-def _split_into_lines(text: str) -> list[str]:
-    compact = (
-        text.replace("\n", "")
-        .replace("、", "")
-        .replace("。", "")
-        .replace("？", "")
-        .replace("！", "")
-        .strip()
-    )
-    if len(compact) <= 6:
-        return [compact]
-    semantic = _semantic_split(compact)
-    if semantic:
-        return semantic
-    return _balanced_split(compact, 3)
-
-
-def _semantic_split(text: str) -> list[str] | None:
-    third = ""
-    remaining = text
-
-    for suffix in HOOK_IMPACT_SUFFIXES:
-        if text.endswith(suffix) and len(text) > len(suffix) + 2:
-            third = suffix
-            remaining = text[: -len(suffix)].strip()
-            break
-
-    if not third:
-        return None
-
-    first, second = _split_first_and_second(remaining)
-    if not first or not second:
-        return None
-
-    return [first, second, third]
-
-
-def _split_first_and_second(text: str) -> tuple[str, str]:
-    for phrase in HOOK_MIDDLE_PHRASES:
-        idx = text.find(phrase)
-        if idx > 0:
-            first = text[:idx].strip()
-            second = text[idx:].strip()
-            if first and second:
-                return first, second
-
-    preferred_markers = ["だけで", "まで", "から", "とは", "には", "では", "の", "は", "が", "を"]
-    best: tuple[str, str] | None = None
-    best_score: float | None = None
-
-    for i in range(1, len(text)):
-        first = text[:i].strip()
-        second = text[i:].strip()
-        if not first or not second:
-            continue
-        if len(first) < 2 or len(second) < 3:
-            continue
-
-        score = abs(len(first) - len(second)) * 1.0
-        matched = False
-        for marker in preferred_markers:
-            if first.endswith(marker):
-                score -= 3.0
-                matched = True
-                break
-        if not matched and len(first) <= 4:
-            score -= 1.5
-        if len(first) > 9:
-            score += 3.0
-        if len(second) > 10:
-            score += 2.0
-
-        if best_score is None or score < best_score:
-            best_score = score
-            best = (first, second)
-
-    if best:
-        return best
-    return "", ""
-
-
-def _balanced_split(text: str, parts_count: int) -> list[str]:
-    preferred_breaks = {"の", "を", "が", "で", "に", "と", "は", "も"}
-    break_count = parts_count - 1
-    best_score = None
-    best_breaks: list[int] | None = None
-
-    def search(start: int, chosen: list[int]) -> None:
-        nonlocal best_score, best_breaks
-        if len(chosen) == break_count:
-            pieces = []
-            prev = 0
-            for idx in chosen:
-                pieces.append(text[prev:idx].strip())
-                prev = idx
-            pieces.append(text[prev:].strip())
-            if any(not piece for piece in pieces):
-                return
-
-            lengths = [len(piece) for piece in pieces]
-            ideal = len(text) / parts_count
-            score = sum(abs(length - ideal) for length in lengths) + (max(lengths) - min(lengths))
-            for idx in chosen:
-                if text[idx - 1] in preferred_breaks:
-                    score -= 1.2
-            if best_score is None or score < best_score:
-                best_score = score
-                best_breaks = chosen[:]
-            return
-
-        for idx in range(start, len(text)):
-            if idx <= 0 or idx >= len(text):
-                continue
-            if chosen and idx <= chosen[-1] + 1:
-                continue
-            chosen.append(idx)
-            search(idx + 1, chosen)
-            chosen.pop()
-
-    search(1, [])
-
-    if not best_breaks:
-        avg = len(text) / parts_count
-        best_breaks = [round(avg * i) for i in range(1, parts_count)]
-
-    pieces = []
-    prev = 0
-    for idx in best_breaks:
-        pieces.append(text[prev:idx].strip())
-        prev = idx
-    pieces.append(text[prev:].strip())
-    return [piece for piece in pieces if piece]

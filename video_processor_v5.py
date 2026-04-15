@@ -3,6 +3,7 @@ import os
 import subprocess
 
 import config
+from display_formatter import format_hook
 from utils import get_audio_duration, setup_logger, video_path_for
 
 logger = setup_logger("video_processor_v5")
@@ -223,7 +224,7 @@ def _create_hook_ass(post_id: str, subtitle_path: str, hook_text: str) -> str | 
         return None
 
     ass_path = os.path.join(config.SUBTITLE_DIR, f"post_{post_id}_hook.ass")
-    escaped_text = _escape_ass_text(_wrap_hook_text(text))
+    escaped_text = _escape_ass_text(format_hook(text).replace("\n", r"\N"))
     ass = (
         "[Script Info]\n"
         "ScriptType: v4.00+\n"
@@ -339,55 +340,6 @@ def _run_ffmpeg(cmd: list[str]) -> None:
     logger.info("[run_ffmpeg] done")
 
 
-def _wrap_hook_text(text: str) -> str:
-    compact = (
-        text.replace("\n", "")
-        .replace("、", "")
-        .replace("。", "")
-        .replace("？", "")
-        .replace("！", "")
-        .strip()
-    )
-    if not compact:
-        return text
-    parts = _split_hook_into_three_lines(compact)
-    return r"\N".join(parts)
-
-
-def _split_hook_into_three_lines(text: str) -> list[str]:
-    preferred_breaks = {"の", "を", "が", "で", "に", "と", "は", "も"}
-    best_score = None
-    best_breaks: tuple[int, int] | None = None
-
-    for i in range(1, len(text) - 1):
-        for j in range(i + 1, len(text)):
-            first = text[:i].strip()
-            second = text[i:j].strip()
-            third = text[j:].strip()
-            if not first or not second or not third:
-                continue
-            lengths = [len(first), len(second), len(third)]
-            score = (max(lengths) - min(lengths)) + sum(abs(length - len(text) / 3) for length in lengths)
-            if text[i - 1] in preferred_breaks:
-                score -= 1.2
-            if text[j - 1] in preferred_breaks:
-                score -= 1.2
-            # 行頭に助詞が来るのを避ける
-            if text[i] in preferred_breaks:
-                score += 2.5
-            if text[j] in preferred_breaks:
-                score += 2.5
-            if best_score is None or score < best_score:
-                best_score = score
-                best_breaks = (i, j)
-
-    if best_breaks is None:
-        split1 = max(1, len(text) // 3)
-        split2 = max(split1 + 1, (len(text) * 2) // 3)
-        return [text[:split1].strip(), text[split1:split2].strip(), text[split2:].strip()]
-
-    i, j = best_breaks
-    return [text[:i].strip(), text[i:j].strip(), text[j:].strip()]
 
 
 def _escape_ass_text(text: str) -> str:

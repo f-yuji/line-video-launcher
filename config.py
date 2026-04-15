@@ -63,4 +63,7 @@ VOICE_PLAYBACK_SPEED = float(os.environ.get("VOICE_PLAYBACK_SPEED", "1.08"))
 END_CTA_TEXT = os.environ.get("END_CTA_TEXT", "詰み回避は本文で。")
 END_PADDING_SECONDS = float(os.environ.get("END_PADDING_SECONDS", "2.0"))
 THUMBNAIL_DIR = os.environ.get("THUMBNAIL_DIR", "thumbnails")
+
+# Supabase Storage バケット名（デフォルト: videos）
+SUPABASE_STORAGE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "videos")
 HOOK_IMAGE_SECONDS = float(os.environ.get("HOOK_IMAGE_SECONDS", "3.6"))

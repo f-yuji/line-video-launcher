@@ -12,7 +12,8 @@ logger = setup_logger("line_handlers")
 _PREFIX_REGISTER = "登録:"
 _CMD_GENERATE = "生成"
 _CMD_POST = "投稿"
-_PREFIX_APPROVE = "承認:"   # 将来: 「承認: {id}」で ready → approved
+_PREFIX_APPROVE = "承認:"
+_PREFIX_POST_ID = "投稿:"      # Quick Reply から「投稿: {post_id}」で承認→投稿
 
 
 def handle_message(user_id: str, text: str) -> str:
@@ -34,9 +35,13 @@ def handle_message(user_id: str, text: str) -> str:
     if stripped == _CMD_POST:
         return _handle_post(user_id)
 
-    # ── 承認（将来拡張用） ──
+    # ── 承認 ──
     if stripped.startswith(_PREFIX_APPROVE):
         return _handle_approve(user_id, stripped)
+
+    # ── Quick Reply からの投稿（承認→投稿を一発で） ──
+    if stripped.startswith(_PREFIX_POST_ID):
+        return _handle_post_by_id(user_id, stripped)
 
     return _handle_quick_generate(user_id, stripped)
 
@@ -127,6 +132,39 @@ def _handle_post(user_id: str) -> str:
         f"投稿処理を開始しました！\n"
         f"対象 ({len(ids)}件):\n{ids_str}\n\n"
         f"完了したらLINEでお知らせします。"
+    )
+
+
+def _handle_post_by_id(user_id: str, text: str) -> str:
+    """「投稿: {post_id}」で ready → approved → posting を一発で行う"""
+    post_id = text[len(_PREFIX_POST_ID):].strip()
+    if not post_id:
+        return "投稿するIDを指定してください。"
+
+    post = db.get_post(post_id)
+    if not post:
+        return f"投稿ID {post_id} が見つかりません。"
+    if post["line_user_id"] != user_id:
+        return "他のユーザーの投稿は操作できません。"
+    if post["status"] not in ("ready", "approved"):
+        return f"この投稿は投稿できません。現在のステータス: {post['status']}"
+
+    # ready → approved
+    if post["status"] == "ready":
+        if not db.claim_post_for_approval(post_id):
+            return "承認処理に失敗しました。もう一度試してください。"
+        post = db.get_post(post_id)
+
+    # approved → posting
+    if not db.claim_post_for_posting(post_id):
+        return "投稿処理の開始に失敗しました。もう一度試してください。"
+
+    worker.enqueue_posting(post)
+    logger.info(f"[handler] post_by_id post_id={post_id}")
+    return (
+        f"投稿を開始しました！\n"
+        f"投稿ID: {post_id}\n"
+        f"完了したらお知らせします。"
     )
 
 

@@ -96,9 +96,17 @@ def _run_generation(post: dict) -> None:
             video_path=video_path,
         )
 
-        # LINE 通知
-        notifier.notify_generation_complete(user_id, post_id)
+        # LINE 通知（投稿文・動画セット送信）
+        notifier.notify_generation_complete_with_content(
+            user_id=user_id,
+            post_id=post_id,
+            instagram_text=captions.instagram_text,
+            tiktok_text=captions.tiktok_text,
+            hashtags=captions.hashtags,
+            video_path=video_path,
+        )
         logger.info(f"[worker] [{post_id}] generation complete")
+
 
     except Exception as e:
         err_msg = f"[{step}] {type(e).__name__}: {str(e)[:300]}"
