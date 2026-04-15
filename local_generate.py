@@ -69,7 +69,7 @@ def main() -> None:
     print("[local] generating hook image...")
     hook_image_path = thumbnail_generator.generate_hook_image(
         post_id,
-        display_script.splitlines()[0] if display_script.splitlines() else "",
+        script_result.hook_lines,
     )
     cta_image_path = thumbnail_generator.generate_cta_image(
         post_id,

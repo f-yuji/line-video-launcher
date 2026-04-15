@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from display_formatter import format_hook_lines
 from utils import cta_image_path_for, hook_image_path_for, setup_logger
 
 logger = setup_logger("thumbnail_generator_v2")
@@ -30,22 +29,12 @@ FONT_CANDIDATES = [
 HOOK_MAX_TEXT_WIDTH = 940
 
 
-def generate_hook_image(post_id: str, text: str) -> str | None:
-    text = (text or "").strip()
-    if not text:
+def generate_hook_image(post_id: str, hook_lines: list[str]) -> str | None:
+    if not hook_lines or not any(hook_lines):
         return None
 
     Image, ImageDraw, ImageFont = _load_pillow()
-    raw_lines = format_hook_lines(text)
-    # 必ず3要素に正規化
-    if len(raw_lines) == 1:
-        lines = [raw_lines[0], "", ""]
-    elif len(raw_lines) == 2:
-        lines = [raw_lines[0], raw_lines[1], ""]
-    elif len(raw_lines) > 3:
-        lines = [raw_lines[0], "".join(raw_lines[1:-1]), raw_lines[-1]]
-    else:
-        lines = raw_lines
+    lines = (list(hook_lines) + ["", "", ""])[:3]
 
     image = Image.new("RGBA", (WIDTH, HEIGHT), BACKGROUND)
     draw = ImageDraw.Draw(image)

@@ -101,33 +101,22 @@ def notify_generation_complete(user_id: str, post_id: str) -> None:
 def notify_generation_complete_with_content(
     user_id: str,
     post_id: str,
-    instagram_text: str,
-    tiktok_text: str,
+    body_text: str,
     hashtags: str,
     video_path: str,
 ) -> None:
     """
-    生成完了後に投稿文・ハッシュタグ・動画をまとめてLINEへ送信する。
-    スマホからそのままコピペ投稿できる形式で分割送信する。
+    生成完了後に本文・ハッシュタグ・動画をまとめてLINEへ送信する。
     """
-    # 1通目: 完了通知
+    # 1通目: 本文 + ハッシュタグ（コピペ用）
     _push_messages(user_id, [
-        _text_msg(
-            "動画生成が完了しました。\n各SNS投稿文を送ります。"
-        )
+        _text_msg(f"{body_text}\n\n{hashtags}"),
     ])
 
-    # 2〜4通目: Instagram / TikTok / Hashtags をまとめて送信（最大5通制限内）
-    _push_messages(user_id, [
-        _text_msg(f"【Instagram】\n{instagram_text}"),
-        _text_msg(f"【TikTok】\n{tiktok_text}"),
-        _text_msg(f"【HASHTAGS】\n{hashtags}"),
-    ])
-
-    # 5通目: 動画
+    # 2通目: 動画
     _send_video(user_id, video_path, post_id)
 
-    # 6通目: 操作ボタン（Flex Message で常に残る）
+    # 3通目: 操作ボタン
     _push_messages(user_id, [_action_buttons_flex(post_id)])
 
     logger.info(f"[notifier] sent content to {user_id} post_id={post_id}")

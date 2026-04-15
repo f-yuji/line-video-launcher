@@ -60,7 +60,7 @@ def _run_generation(post: dict) -> None:
         logger.info(f"[worker] [{post_id}] generating hook images")
         hook_image_path = thumbnail_generator.generate_hook_image(
             post_id,
-            display_script.splitlines()[0] if display_script.splitlines() else "",
+            script_result.hook_lines,
         )
         cta_image_path = thumbnail_generator.generate_cta_image(
             post_id,
@@ -100,8 +100,7 @@ def _run_generation(post: dict) -> None:
         notifier.notify_generation_complete_with_content(
             user_id=user_id,
             post_id=post_id,
-            instagram_text=captions.instagram_text,
-            tiktok_text=captions.tiktok_text,
+            body_text=captions.body_text,
             hashtags=captions.hashtags,
             video_path=video_path,
         )

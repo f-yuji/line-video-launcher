@@ -51,6 +51,10 @@ _SYSTEM_PROMPT = """\
 1行目
 2行目
 ...
+---HOOK---
+1行目
+2行目
+3行目
 
 DISPLAY のルール:
 - 10〜13行
@@ -84,6 +88,15 @@ SPEECH のルール:
   「〜だ」「〜る」「〜してる」「〜になる」へ寄せる
 - 音声で切れ味が出るように、口語の常体でまとめる
 - ラスト2行は DISPLAY と同じ「問いかけ→断定」の2行構成にする
+
+HOOK のルール:
+- DISPLAY の1行目を画像表示用に3行へ分割する
+- 必ず3行（それ以上でも以下でもない）
+- 1行目: 対象・文脈（名詞句）
+- 2行目: 動作・状況
+- 3行目: 結論・インパクトワード（2〜6文字の短い断定）
+- 単語の途中で切らない
+- 「る」「し」「て」「で」「が」「の」などが行頭に来ないようにする
 """
 
 
@@ -91,6 +104,7 @@ SPEECH のルール:
 class ScriptResult:
     display_lines: list[str]
     speech_lines: list[str]
+    hook_lines: list[str]
 
     @property
     def display_text(self) -> str:
@@ -132,22 +146,29 @@ def generate_script(raw_text: str) -> ScriptResult:
 def _parse_script_result(raw: str) -> ScriptResult:
     display_marker = "---DISPLAY---"
     speech_marker = "---SPEECH---"
+    hook_marker = "---HOOK---"
 
     display_start = raw.find(display_marker)
     speech_start = raw.find(speech_marker)
-    if display_start == -1 or speech_start == -1:
+    hook_start = raw.find(hook_marker)
+    if display_start == -1 or speech_start == -1 or hook_start == -1:
         raise ValueError("script output format invalid")
 
     display_chunk = raw[display_start + len(display_marker):speech_start].strip()
-    speech_chunk = raw[speech_start + len(speech_marker):].strip()
+    speech_chunk = raw[speech_start + len(speech_marker):hook_start].strip()
+    hook_chunk = raw[hook_start + len(hook_marker):].strip()
 
     display_lines = [line.strip() for line in display_chunk.splitlines() if line.strip()]
     speech_lines = [line.strip() for line in speech_chunk.splitlines() if line.strip()]
-    if not 10 <= len(display_lines) <= 13:
-        raise ValueError(f"expected 10-13 display lines, got {len(display_lines)}")
+    hook_lines = [line.strip() for line in hook_chunk.splitlines() if line.strip()]
+
+    if not 8 <= len(display_lines) <= 18:
+        raise ValueError(f"expected 8-18 display lines, got {len(display_lines)}")
     if len(display_lines) != len(speech_lines):
         raise ValueError(
             f"display/speech line count mismatch: {len(display_lines)} vs {len(speech_lines)}"
         )
+    if len(hook_lines) != 3:
+        raise ValueError(f"expected 3 hook lines, got {len(hook_lines)}")
 
-    return ScriptResult(display_lines=display_lines, speech_lines=speech_lines)
+    return ScriptResult(display_lines=display_lines, speech_lines=speech_lines, hook_lines=hook_lines)

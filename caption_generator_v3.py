@@ -134,9 +134,10 @@ def _parse_caption_output(raw: str) -> CaptionResult:
 
     generated_hashtags = _extract("HASHTAGS")
     final_hashtags = _merge_hashtags(generated_hashtags)
+    formatted_body = _format_body_text(_extract("BODY"))
 
     return CaptionResult(
-        body_text=_extract("BODY"),
+        body_text=formatted_body,
         x_text=_extract("X"),
         youtube_text=_extract("YOUTUBE"),
         tiktok_text=_extract("TIKTOK"),
@@ -175,3 +176,64 @@ def _normalize_hashtag(tag: str) -> str:
     if not cleaned.startswith("#"):
         cleaned = "#" + cleaned.lstrip("#")
     return cleaned
+
+
+def _format_body_text(text: str) -> str:
+    text = (text or "").strip()
+    if not text:
+        return text
+
+    normalized = text.replace("\r\n", "\n")
+    if "\n" in normalized:
+        paragraphs = [part.strip() for part in normalized.split("\n") if part.strip()]
+        return "\n\n".join(paragraphs)
+
+    sentences = []
+    current = ""
+    for ch in normalized:
+        current += ch
+        if ch in "。！？":
+            sentence = current.strip()
+            if sentence:
+                sentences.append(sentence)
+            current = ""
+    if current.strip():
+        sentences.append(current.strip())
+
+    if not sentences:
+        return normalized
+
+    paragraphs: list[str] = []
+    current_group: list[str] = []
+    transition_markers = ("でも", "ただ", "むしろ", "だから", "じゃあ", "つまり", "結局", "ここで")
+
+    for sentence in sentences:
+        if current_group and (
+            len(current_group) >= 2 or
+            sentence.startswith(transition_markers)
+        ):
+            paragraphs.append("".join(current_group))
+            current_group = []
+        current_group.append(sentence)
+
+    if current_group:
+        paragraphs.append("".join(current_group))
+
+    if paragraphs:
+        last = paragraphs[-1]
+        if "今すぐ" in last or "詰む" in last or "危ない" in last:
+            tail_sentences = []
+            current = ""
+            for ch in last:
+                current += ch
+                if ch in "。！？":
+                    tail_sentences.append(current.strip())
+                    current = ""
+            if current.strip():
+                tail_sentences.append(current.strip())
+            if len(tail_sentences) >= 2:
+                paragraphs[-1] = "".join(tail_sentences[:-1]).strip()
+                paragraphs.append(tail_sentences[-1].strip())
+                paragraphs = [p for p in paragraphs if p]
+
+    return "\n\n".join(paragraphs)
