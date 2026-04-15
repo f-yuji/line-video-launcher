@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import config
 from utils import setup_logger
 
-logger = setup_logger("caption_generator_v2")
+logger = setup_logger("caption_generator_v3")
 
 
 @dataclass
@@ -37,7 +37,7 @@ _SYSTEM_PROMPT = """\
 - トーンは動画と同じく、やや強めで本質を突く
 
 BODY のルール:
-- 220〜380字
+- 220～380字
 - 冒頭で「何がよくある間違いか」を短く示す
 - 中盤で「なぜ危ないのか」を具体的に説明する
 - 終盤で「じゃあどうするべきか」を実務寄りに示す
@@ -50,29 +50,10 @@ BODY のルール:
 - YouTube は少し長め、X と TikTok は短めでよい
 
 ハッシュタグのルール:
-- 動画の内容を象徴するタグを5〜8個厳選すること
-- 「#マイホーム」「#不動産」のような当たり前すぎるタグだけでなく、
-  視聴者の「悩み」や「感情」に刺さる言葉を必ず混ぜること
-  例：#損したくない #人生の落とし穴 #住宅ローンの闇
-- 汎用的なタグと具体的なタグをバランスよく配分し、重複を避けること
-- #詰み回避ラボ は固定で必ず含めること
-
-出力フォーマット（必ずこの形式で）:
----BODY---
-（本文：220〜380字、「間違い→詳しい説明→対策」構成）
----X---
-（X/Twitter用：140字以内、本文の要約）
----YOUTUBE---
-（YouTube説明文：180〜320字、本文の要約）
----TIKTOK---
-（TikTok用：60〜100字、本文の要約）
----INSTAGRAM---
-（Instagram用：120〜220字、本文の要約）
----HASHTAGS---
-（ハッシュタグのみ、スペース区切りで5〜8個、#詰み回避ラボ を必ず含める）
-"""
-
-_PROMPT_APPEND = """
+- 3～5個
+- テーマと投稿内容に合うものだけ
+- 無理にバズワードを混ぜない
+- 内容に直接関係ない汎用タグは避ける
 
 追加ルール:
 - BODYの締めは優等生っぽく終わらせない
@@ -87,10 +68,23 @@ Xの追加ルール:
 - 最後は短く強く締める
 
 HASHTAGSの追加ルール:
-- ハッシュタグは多すぎ禁止
 - 本文に直接関係あるものだけを3〜5個に絞る
 - ふわっとした汎用タグは避ける
 - 時事ネタや話題性が明らかに噛む内容なら、その文脈に合うタグを優先する
+
+出力フォーマット（必ずこの形式で）:
+---BODY---
+（本文：220～380字、「間違い→詳しい説明→対策」構成）
+---X---
+（X/Twitter用：140字以内、断言と箇条書きベース）
+---YOUTUBE---
+（YouTube説明文：180～320字、本文の要約）
+---TIKTOK---
+（TikTok用：60～100字、本文の要約）
+---INSTAGRAM---
+（Instagram用：120～220字、本文の要約）
+---HASHTAGS---
+（ハッシュタグのみ、スペース区切りで3～5個）
 """
 
 
@@ -107,7 +101,7 @@ def generate_captions(video_script: str) -> CaptionResult:
     res = _get_client().chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT + _PROMPT_APPEND},
+            {"role": "system", "content": _SYSTEM_PROMPT},
             {"role": "user", "content": video_script},
         ],
         temperature=0.7,
