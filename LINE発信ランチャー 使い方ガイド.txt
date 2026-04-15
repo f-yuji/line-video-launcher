@@ -145,11 +145,14 @@ X/YouTube投稿が失敗	DBの platform_status_x / platform_status_youtube
 
 python local_generate.py
 
+ngrok http 5001
+
+
 git status
 git add .
-git commit -m ""
+git commit -m "完了"
 git push -u origin main
 
-https://line-video-launcher.onrender.com
+https://line-video-launcher.onrender.com/callback
 
 https://heterozygotic-paityn-bogglingly.ngrok-free.dev/callback

@@ -208,7 +208,7 @@ def _build_ffmpeg_command(
         "-filter_complex", ";".join(filter_parts),
         "-map", "[vout]",
         "-map", audio_map,
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
         "-c:a", "aac", "-b:a", "192k",
         "-shortest",
         output_path,
