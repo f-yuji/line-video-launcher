@@ -135,13 +135,17 @@ def _parse_caption_output(raw: str) -> CaptionResult:
     generated_hashtags = _extract("HASHTAGS")
     final_hashtags = _merge_hashtags(generated_hashtags)
     formatted_body = _format_body_text(_extract("BODY"))
+    formatted_x = _format_social_text(_extract("X"))
+    formatted_youtube = _format_social_text(_extract("YOUTUBE"))
+    formatted_tiktok = _format_social_text(_extract("TIKTOK"))
+    formatted_instagram = _format_social_text(_extract("INSTAGRAM"))
 
     return CaptionResult(
         body_text=formatted_body,
-        x_text=_extract("X"),
-        youtube_text=_extract("YOUTUBE"),
-        tiktok_text=_extract("TIKTOK"),
-        instagram_text=_extract("INSTAGRAM"),
+        x_text=formatted_x,
+        youtube_text=formatted_youtube,
+        tiktok_text=formatted_tiktok,
+        instagram_text=formatted_instagram,
         hashtags=final_hashtags,
         generated_hashtags=generated_hashtags,
     )
@@ -237,3 +241,59 @@ def _format_body_text(text: str) -> str:
                 paragraphs = [p for p in paragraphs if p]
 
     return "\n\n".join(paragraphs)
+
+
+def _format_social_text(text: str) -> str:
+    text = (text or "").strip()
+    if not text:
+        return text
+
+    normalized = text.replace("\r\n", "\n")
+    if "\n" in normalized:
+        paragraphs = [part.strip() for part in normalized.split("\n") if part.strip()]
+        return "\n".join(paragraphs)
+
+    if "・" in normalized:
+        parts = [part.strip() for part in normalized.split("・") if part.strip()]
+        if len(parts) >= 2:
+            head = parts[0]
+            bullets = [f"・{part}" for part in parts[1:]]
+            return "\n".join([head, *bullets])
+
+    sentences = []
+    current = ""
+    for ch in normalized:
+        current += ch
+        if ch in "。！？":
+            sentence = current.strip()
+            if sentence:
+                sentences.append(sentence)
+            current = ""
+    if current.strip():
+        sentences.append(current.strip())
+
+    if len(sentences) <= 1:
+        return normalized
+
+    lines: list[str] = []
+    current_line = ""
+    transition_markers = ("でも", "ただ", "むしろ", "だから", "じゃあ", "つまり", "結局", "今すぐ")
+
+    for sentence in sentences:
+        should_break = (
+            bool(current_line)
+            and (
+                len(current_line) >= 36
+                or sentence.startswith(transition_markers)
+            )
+        )
+        if should_break:
+            lines.append(current_line.strip())
+            current_line = sentence
+        else:
+            current_line += sentence
+
+    if current_line.strip():
+        lines.append(current_line.strip())
+
+    return "\n".join(lines)
