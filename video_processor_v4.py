@@ -5,7 +5,7 @@ import subprocess
 import config
 from utils import get_audio_duration, setup_logger, video_path_for
 
-logger = setup_logger("video_processor_v2")
+logger = setup_logger("video_processor_v4")
 
 OUTPUT_WIDTH = 1080
 OUTPUT_HEIGHT = 1920
@@ -28,13 +28,13 @@ _SUBTITLE_STYLE = (
 )
 
 _HOOK_STYLE_LINE = (
-    "Style: Hook,Yu Gothic,110,&H00FFFFFF,&H00FFFFFF,&H00000000,&HCC000000,"
-    "-1,0,0,0,100,100,0,0,4,2,0,5,60,60,300,1\n"
+    "Style: Hook,Yu Gothic,138,&H0000A5FF,&H0000A5FF,&H00000000,&HEE000000,"
+    "-1,0,0,0,100,100,0,0,4,3,0,5,40,40,260,1\n"
 )
 
 _CTA_STYLE_LINE = (
-    "Style: Cta,Yu Gothic,96,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,"
-    "-1,0,0,0,100,100,0,0,1,5,1,2,80,80,180,1\n"
+    "Style: Cta,Yu Gothic,116,&H00FFFFFF,&H00FFFFFF,&H00000000,&HCC000000,"
+    "-1,0,0,0,100,100,0,0,1,5,1,2,60,60,135,1\n"
 )
 
 
@@ -49,7 +49,13 @@ def pick_raw_video() -> str:
     return files[0]
 
 
-def process_video(post_id: str, audio_path: str, subtitle_path: str, hook_text: str = "") -> str:
+def process_video(
+    post_id: str,
+    audio_path: str,
+    subtitle_path: str,
+    hook_text: str = "",
+    hook_image_path: str | None = None,
+) -> str:
     raw_video = pick_raw_video()
     output_path = video_path_for(post_id)
     audio_duration = get_audio_duration(audio_path)
@@ -70,6 +76,7 @@ def process_video(post_id: str, audio_path: str, subtitle_path: str, hook_text: 
         output_path=output_path,
         audio_duration=audio_duration,
         overlay_ass_path=overlay_ass_path,
+        hook_image_path=hook_image_path,
         subtitle_events=subtitle_events,
         se_path=se_path,
     )
@@ -86,6 +93,7 @@ def _build_ffmpeg_command(
     output_path: str,
     audio_duration: float,
     overlay_ass_path: str | None,
+    hook_image_path: str | None,
     subtitle_events: list[tuple[float, float, str]],
     se_path: str | None,
 ) -> list[str]:
@@ -94,29 +102,46 @@ def _build_ffmpeg_command(
         f"subtitles={escaped_sub}:charenc=UTF-8:"
         f"force_style='{_SUBTITLE_STYLE}'"
     )
-    video_chain = (
-        f"[0:v]crop=ih*{OUTPUT_WIDTH}/{OUTPUT_HEIGHT}:ih,"
-        f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT},"
-        f"{subtitle_filter}"
-    )
-    if overlay_ass_path:
-        escaped_overlay = overlay_ass_path.replace("\\", "/").replace(":", "\\:")
-        video_chain += f",subtitles={escaped_overlay}:charenc=UTF-8"
-
-    filter_parts = [f"{video_chain}[vout]"]
+    filter_parts = [
+        f"[0:v]scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:force_original_aspect_ratio=increase,"
+        f"crop={OUTPUT_WIDTH}:{OUTPUT_HEIGHT},"
+        f"{subtitle_filter}[vbase]"
+    ]
     cmd = [
         "ffmpeg", "-y",
         "-stream_loop", "-1", "-i", raw_video_path,
         "-i", audio_path,
     ]
     audio_map = "1:a"
+    current_video_label = "[vbase]"
+    next_input_index = 2
+
+    if hook_image_path and os.path.isfile(hook_image_path):
+        cmd.extend(["-loop", "1", "-i", hook_image_path])
+        filter_parts.append(
+            f"[{next_input_index}:v]scale={OUTPUT_WIDTH * 0.92}:-1[hookimg]"
+        )
+        filter_parts.append(
+            f"{current_video_label}[hookimg]overlay=(W-w)/2:(H-h)/2:"
+            f"enable='between(t,0,{config.HOOK_IMAGE_SECONDS})'[vhook]"
+        )
+        current_video_label = "[vhook]"
+        next_input_index += 1
+
+    if overlay_ass_path:
+        escaped_overlay = overlay_ass_path.replace("\\", "/").replace(":", "\\:")
+        filter_parts.append(
+            f"{current_video_label}subtitles={escaped_overlay}:charenc=UTF-8[vout]"
+        )
+    else:
+        filter_parts.append(f"{current_video_label}null[vout]")
 
     if se_path and subtitle_events:
         cmd.extend(["-stream_loop", "-1", "-i", se_path])
         first_start = subtitle_events[0][0]
         delay = int(first_start * 1000)
         filter_parts.append(
-            f"[2:a]atrim=0:0.45,asetpts=N/SR/TB,"
+            f"[{next_input_index}:a]atrim=0:0.45,asetpts=N/SR/TB,"
             f"afade=t=out:st=0.30:d=0.15,"
             f"adelay={delay}|{delay},volume=0.65,apad[se0]"
         )
@@ -169,16 +194,17 @@ def _read_srt_events(subtitle_path: str) -> list[tuple[float, float, str]]:
 
 
 def _create_hook_ass(post_id: str, subtitle_path: str, hook_text: str) -> str | None:
-    hook_text = hook_text.strip()
-    if not hook_text:
-        return None
     events = _read_srt_events(subtitle_path)
     if not events:
         return None
 
-    start_seconds, end_seconds, _ = events[0]
+    start_seconds, end_seconds, srt_text = events[0]
+    text = (hook_text or srt_text).strip()
+    if not text:
+        return None
+
     ass_path = os.path.join(config.SUBTITLE_DIR, f"post_{post_id}_hook.ass")
-    escaped_text = _escape_ass_text(_wrap_hook_text(hook_text))
+    escaped_text = _escape_ass_text(_wrap_hook_text(text))
     ass = (
         "[Script Info]\n"
         "ScriptType: v4.00+\n"
@@ -207,9 +233,9 @@ def _create_end_cta_ass(post_id: str, subtitle_path: str, audio_duration: float)
     events = _read_srt_events(subtitle_path)
     if not events:
         return None
+
     start_seconds = events[-1][0]
     end_seconds = max(audio_duration - 0.05, start_seconds + 0.8)
-
     ass_path = os.path.join(config.SUBTITLE_DIR, f"post_{post_id}_cta.ass")
     escaped_text = _escape_ass_text(cta_text)
     ass = (
@@ -285,26 +311,75 @@ def _merge_ass_overlays(post_id: str, *paths: str | None) -> str | None:
 
 def _run_ffmpeg(cmd: list[str]) -> None:
     logger.info(f"[run_ffmpeg] cmd={' '.join(cmd[:6])} ...")
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=False)
     if result.returncode != 0:
-        raise RuntimeError(f"ffmpeg failed:\n{result.stderr[-1200:]}")
+        stderr = (result.stderr or b"").decode("utf-8", errors="replace")
+        if not stderr:
+            stderr = (result.stdout or b"").decode("utf-8", errors="replace")
+        raise RuntimeError(f"ffmpeg failed:\n{stderr[-1200:]}")
     logger.info("[run_ffmpeg] done")
 
 
 def _wrap_hook_text(text: str) -> str:
-    compact = text.replace("、", "").replace("。", "").replace("！", "").replace("？", "")
-    parts: list[str] = []
-    cursor = 0
-    max_chars = 7
-    while cursor < len(compact):
-        next_cursor = min(cursor + max_chars, len(compact))
-        parts.append(compact[cursor:next_cursor])
-        cursor = next_cursor
-    return r"\N".join(parts[:4])
+    compact = (
+        text.replace("\n", "")
+        .replace("、", "")
+        .replace("。", "")
+        .replace("？", "")
+        .replace("！", "")
+        .strip()
+    )
+    if not compact:
+        return text
+
+    parts = _split_hook_into_three_lines(compact)
+    return r"\N".join(parts)
+
+
+def _split_hook_into_three_lines(text: str) -> list[str]:
+    preferred_breaks = {"の", "を", "が", "で", "に", "と", "は", "も"}
+    candidates: list[tuple[int, int]] = []
+    for i, ch in enumerate(text[:-1], start=1):
+        score = abs(len(text) / 3 - i)
+        if ch in preferred_breaks:
+            score -= 1.5
+        candidates.append((i, score))
+
+    best: tuple[float, tuple[int, int]] | None = None
+    for i, _ in candidates:
+        for j, _ in candidates:
+            if j <= i + 1:
+                continue
+            if len(text) - j < 2:
+                continue
+            first = text[:i].strip()
+            second = text[i:j].strip()
+            third = text[j:].strip()
+            if not first or not second or not third:
+                continue
+            lengths = [len(first), len(second), len(third)]
+            penalty = max(lengths) - min(lengths)
+            penalty += abs(len(first) - len(text) / 3)
+            penalty += abs(len(second) - len(text) / 3)
+            penalty += abs(len(third) - len(text) / 3)
+            if text[i - 1] in preferred_breaks:
+                penalty -= 1.2
+            if text[j - 1] in preferred_breaks:
+                penalty -= 1.2
+            if best is None or penalty < best[0]:
+                best = (penalty, (i, j))
+
+    if best is None:
+        split1 = max(1, len(text) // 3)
+        split2 = max(split1 + 1, (len(text) * 2) // 3)
+        return [text[:split1].strip(), text[split1:split2].strip(), text[split2:].strip()]
+
+    i, j = best[1]
+    return [text[:i].strip(), text[i:j].strip(), text[j:].strip()]
 
 
 def _escape_ass_text(text: str) -> str:
-    return text.replace("\\", r"\\").replace("{", r"\{").replace("}", r"\}")
+    return text.replace("{", r"\{").replace("}", r"\}")
 
 
 def _parse_srt_time(value: str) -> float:

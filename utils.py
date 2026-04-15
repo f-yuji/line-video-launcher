@@ -34,6 +34,7 @@ def ensure_dirs() -> None:
         config.AUDIO_DIR,
         config.SUBTITLE_DIR,
         config.OUTPUT_DIR,
+        getattr(config, "THUMBNAIL_DIR", "thumbnails"),
         config.LOG_DIR,
     ]:
         os.makedirs(d, exist_ok=True)
@@ -84,3 +85,13 @@ def subtitle_path_for(post_id: str) -> str:
 
 def video_path_for(post_id: str) -> str:
     return os.path.join(config.OUTPUT_DIR, f"post_{post_id}_video.mp4")
+
+
+def hook_image_path_for(post_id: str) -> str:
+    thumbnail_dir = getattr(config, "THUMBNAIL_DIR", "thumbnails")
+    return os.path.join(thumbnail_dir, f"post_{post_id}_hook.png")
+
+
+def cta_image_path_for(post_id: str) -> str:
+    thumbnail_dir = getattr(config, "THUMBNAIL_DIR", "thumbnails")
+    return os.path.join(thumbnail_dir, f"post_{post_id}_cta.png")

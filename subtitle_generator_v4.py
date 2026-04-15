@@ -40,7 +40,7 @@ def _build_srt(lines: list[str], total_duration: float) -> str:
         if i == len(lines) - 1:
             end = max(start + 0.8, total_duration - 0.1)
 
-        display_line = _wrap_subtitle_line(line)
+        display_line = "" if i == 0 else _wrap_subtitle_line(line)
         blocks.append(
             f"{i + 1}\n"
             f"{format_srt_time(start)} --> {format_srt_time(end)}\n"

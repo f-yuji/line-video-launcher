@@ -5,7 +5,7 @@ import subprocess
 import config
 from utils import get_audio_duration, setup_logger, video_path_for
 
-logger = setup_logger("video_processor_v2")
+logger = setup_logger("video_processor_v3")
 
 OUTPUT_WIDTH = 1080
 OUTPUT_HEIGHT = 1920
@@ -95,8 +95,8 @@ def _build_ffmpeg_command(
         f"force_style='{_SUBTITLE_STYLE}'"
     )
     video_chain = (
-        f"[0:v]crop=ih*{OUTPUT_WIDTH}/{OUTPUT_HEIGHT}:ih,"
-        f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT},"
+        f"[0:v]scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:force_original_aspect_ratio=increase,"
+        f"crop={OUTPUT_WIDTH}:{OUTPUT_HEIGHT},"
         f"{subtitle_filter}"
     )
     if overlay_ass_path:
@@ -169,16 +169,17 @@ def _read_srt_events(subtitle_path: str) -> list[tuple[float, float, str]]:
 
 
 def _create_hook_ass(post_id: str, subtitle_path: str, hook_text: str) -> str | None:
-    hook_text = hook_text.strip()
-    if not hook_text:
-        return None
     events = _read_srt_events(subtitle_path)
     if not events:
         return None
 
-    start_seconds, end_seconds, _ = events[0]
+    start_seconds, end_seconds, srt_text = events[0]
+    text = (hook_text or srt_text).strip()
+    if not text:
+        return None
+
     ass_path = os.path.join(config.SUBTITLE_DIR, f"post_{post_id}_hook.ass")
-    escaped_text = _escape_ass_text(_wrap_hook_text(hook_text))
+    escaped_text = _escape_ass_text(_wrap_hook_text(text))
     ass = (
         "[Script Info]\n"
         "ScriptType: v4.00+\n"
@@ -285,22 +286,36 @@ def _merge_ass_overlays(post_id: str, *paths: str | None) -> str | None:
 
 def _run_ffmpeg(cmd: list[str]) -> None:
     logger.info(f"[run_ffmpeg] cmd={' '.join(cmd[:6])} ...")
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=False)
     if result.returncode != 0:
-        raise RuntimeError(f"ffmpeg failed:\n{result.stderr[-1200:]}")
+        stderr = (result.stderr or b"").decode("utf-8", errors="replace")
+        if not stderr:
+            stderr = (result.stdout or b"").decode("utf-8", errors="replace")
+        raise RuntimeError(f"ffmpeg failed:\n{stderr[-1200:]}")
     logger.info("[run_ffmpeg] done")
 
 
 def _wrap_hook_text(text: str) -> str:
-    compact = text.replace("、", "").replace("。", "").replace("！", "").replace("？", "")
-    parts: list[str] = []
-    cursor = 0
-    max_chars = 7
-    while cursor < len(compact):
-        next_cursor = min(cursor + max_chars, len(compact))
-        parts.append(compact[cursor:next_cursor])
-        cursor = next_cursor
-    return r"\N".join(parts[:4])
+    compact = (
+        text.replace("\n", "")
+        .replace("、", "")
+        .replace("。", "")
+        .replace("？", "")
+        .replace("！", "")
+        .strip()
+    )
+    if not compact:
+        return text
+
+    split1 = max(1, len(compact) // 3)
+    split2 = max(split1 + 1, (len(compact) * 2) // 3)
+    parts = [
+        compact[:split1].strip(),
+        compact[split1:split2].strip(),
+        compact[split2:].strip(),
+    ]
+    parts = [part for part in parts if part]
+    return r"\N".join(parts[:3])
 
 
 def _escape_ass_text(text: str) -> str:

@@ -7,13 +7,15 @@
 import threading
 from typing import Optional
 
+import config
 import db
 import notifier
 import script_generator_v13 as script_generator
 import caption_generator_v2 as caption_generator
 import voice_generator_v2 as voice_generator
 import subtitle_generator_v4 as subtitle_generator
-import video_processor_v2 as video_processor
+import thumbnail_generator_v2 as thumbnail_generator
+import video_processor_v5 as video_processor
 import poster_x
 import poster_youtube
 from utils import setup_logger, ensure_dirs
@@ -54,6 +56,17 @@ def _run_generation(post: dict) -> None:
         logger.info(f"[worker] [{post_id}] generating subtitle")
         subtitle_path = subtitle_generator.generate_srt(post_id, display_script, audio_path)
 
+        step = "thumbnail"
+        logger.info(f"[worker] [{post_id}] generating hook images")
+        hook_image_path = thumbnail_generator.generate_hook_image(
+            post_id,
+            display_script.splitlines()[0] if display_script.splitlines() else "",
+        )
+        cta_image_path = thumbnail_generator.generate_cta_image(
+            post_id,
+            config.END_CTA_TEXT if hasattr(config, "END_CTA_TEXT") else "詰み回避は本文で。",
+        )
+
         # 動画生成
         step = "video"
         logger.info(f"[worker] [{post_id}] processing video")
@@ -62,6 +75,8 @@ def _run_generation(post: dict) -> None:
             audio_path,
             subtitle_path,
             hook_text=display_script.splitlines()[0] if display_script.splitlines() else "",
+            hook_image_path=hook_image_path,
+            cta_image_path=cta_image_path,
         )
 
         # DB 更新
