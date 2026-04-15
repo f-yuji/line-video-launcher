@@ -125,6 +125,19 @@ def generate_captions(video_script: str) -> CaptionResult:
     return _parse_caption_output(raw)
 
 
+def merge_manual_hashtags(result: CaptionResult, manual_hashtags: list[str]) -> CaptionResult:
+    merged_hashtags = _merge_hashtags(" ".join([*manual_hashtags, result.generated_hashtags]).strip())
+    return CaptionResult(
+        body_text=result.body_text,
+        x_text=result.x_text,
+        youtube_text=result.youtube_text,
+        tiktok_text=result.tiktok_text,
+        instagram_text=result.instagram_text,
+        hashtags=merged_hashtags,
+        generated_hashtags=result.generated_hashtags,
+    )
+
+
 def _parse_caption_output(raw: str) -> CaptionResult:
     def _extract(tag: str) -> str:
         start_marker = f"---{tag}---"

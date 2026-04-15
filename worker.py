@@ -18,6 +18,7 @@ import thumbnail_generator_v2 as thumbnail_generator
 import video_processor_v5 as video_processor
 import poster_x
 import poster_youtube
+from input_parser import parse_input_text
 from utils import setup_logger, ensure_dirs
 
 logger = setup_logger("worker")
@@ -37,7 +38,8 @@ def _run_generation(post: dict) -> None:
         # 台本生成
         step = "script"
         logger.info(f"[worker] [{post_id}] generating script")
-        script_result = script_generator.generate_script(post["raw_text"])
+        parsed_input = parse_input_text(post["raw_text"])
+        script_result = script_generator.generate_script(parsed_input.context_text)
         display_script = script_result.speech_text
         speech_script = script_result.speech_text
 
@@ -45,6 +47,10 @@ def _run_generation(post: dict) -> None:
         step = "caption"
         logger.info(f"[worker] [{post_id}] generating captions")
         captions = caption_generator.generate_captions(display_script)
+        captions = caption_generator.merge_manual_hashtags(
+            captions,
+            parsed_input.manual_hashtags,
+        )
 
         # 音声生成（OpenAIが生成した音声用テキストを使用）
         step = "voice"

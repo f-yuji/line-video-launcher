@@ -4,6 +4,7 @@ import uuid
 import caption_generator_v4 as caption_generator
 import config
 import db
+from input_parser import parse_input_text
 import script_generator_v13 as script_generator
 import subtitle_generator_v4 as subtitle_generator
 import thumbnail_generator_v2 as thumbnail_generator
@@ -39,6 +40,8 @@ def main() -> None:
     if not topic:
         raise SystemExit("topic is empty")
 
+    parsed_input = parse_input_text(topic)
+
     ensure_dirs()
     post_id = str(uuid.uuid4())
     db_enabled = not args.no_db
@@ -53,12 +56,16 @@ def main() -> None:
 
     print(f"[local] post_id={post_id}")
     print("[local] generating script...")
-    script_result = script_generator.generate_script(topic)
+    script_result = script_generator.generate_script(parsed_input.context_text)
     display_script = script_result.speech_text
     speech_script = script_result.speech_text
 
     print("[local] generating captions...")
     captions = caption_generator.generate_captions(display_script)
+    captions = caption_generator.merge_manual_hashtags(
+        captions,
+        parsed_input.manual_hashtags,
+    )
 
     print("[local] generating voice...")
     audio_path = voice_generator.generate_voice(post_id, speech_script)
@@ -110,6 +117,9 @@ def main() -> None:
     print()
     print("=== HASHTAGS ===")
     print(captions.hashtags)
+    print()
+    print("=== MANUAL HASHTAGS ===")
+    print(" ".join(parsed_input.manual_hashtags))
     print()
     print(f"audio: {audio_path}")
     print(f"subtitle: {subtitle_path}")
