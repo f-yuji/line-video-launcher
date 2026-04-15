@@ -11,7 +11,7 @@ import config
 import db
 import notifier
 import script_generator_v13 as script_generator
-import caption_generator_v3 as caption_generator
+import caption_generator_v4 as caption_generator
 import voice_generator_v2 as voice_generator
 import subtitle_generator_v4 as subtitle_generator
 import thumbnail_generator_v2 as thumbnail_generator

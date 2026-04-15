@@ -1,7 +1,7 @@
 import argparse
 import uuid
 
-import caption_generator_v3 as caption_generator
+import caption_generator_v4 as caption_generator
 import config
 import db
 import script_generator_v13 as script_generator
