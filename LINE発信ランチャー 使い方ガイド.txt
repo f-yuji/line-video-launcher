@@ -141,3 +141,11 @@ Supabaseの posts テーブルで対象レコードを開き、tiktok_text / ins
 LINE通知が届かない	logs/notifier.log
 X/YouTube投稿が失敗	DBの platform_status_x / platform_status_youtube
 エラーの詳細	DBの error_message カラム
+
+
+python local_generate.py
+
+git status
+git add .
+git commit -m "内容修正"
+git push -u origin main

@@ -372,6 +372,11 @@ def _split_hook_into_three_lines(text: str) -> list[str]:
                 score -= 1.2
             if text[j - 1] in preferred_breaks:
                 score -= 1.2
+            # 行頭に助詞が来るのを避ける
+            if text[i] in preferred_breaks:
+                score += 2.5
+            if text[j] in preferred_breaks:
+                score += 2.5
             if best_score is None or score < best_score:
                 best_score = score
                 best_breaks = (i, j)
