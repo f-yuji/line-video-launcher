@@ -11,7 +11,7 @@ WORKDIR /app
 
 # 依存パッケージ（コード変更時にキャッシュを活かす）
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
 # アプリ本体
 COPY . .
