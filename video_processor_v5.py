@@ -44,10 +44,37 @@ def pick_raw_video() -> str:
     files = []
     for ext in exts:
         files.extend(glob.glob(os.path.join(config.RAW_DIR, ext)))
+
     if not files:
-        raise FileNotFoundError(f"No video files found in {config.RAW_DIR}")
+        # raw/ が空なら RAW_VIDEO_URL からダウンロードする
+        url = os.environ.get("RAW_VIDEO_URL", "").strip()
+        if not url:
+            raise FileNotFoundError(
+                f"No video files in {config.RAW_DIR} and RAW_VIDEO_URL is not set"
+            )
+        dest = _download_raw_video(url)
+        files = [dest]
+
     files.sort()
     return files[0]
+
+
+def _download_raw_video(url: str) -> str:
+    """RAW_VIDEO_URL から素材動画をダウンロードして raw/ に保存する"""
+    import urllib.request
+
+    os.makedirs(config.RAW_DIR, exist_ok=True)
+    filename = url.split("?")[0].split("/")[-1] or "raw.mp4"
+    dest = os.path.join(config.RAW_DIR, filename)
+
+    if os.path.exists(dest):
+        logger.info(f"[pick_raw_video] using cached {dest}")
+        return dest
+
+    logger.info(f"[pick_raw_video] downloading raw video from {url}")
+    urllib.request.urlretrieve(url, dest)
+    logger.info(f"[pick_raw_video] saved to {dest}")
+    return dest
 
 
 def process_video(
@@ -186,7 +213,13 @@ def _build_ffmpeg_command(
 
 def _find_se_path() -> str | None:
     files = sorted(glob.glob(os.path.join(config.RAW_DIR, "*.mp3")))
-    return files[0] if files else None
+    if files:
+        return files[0]
+
+    url = os.environ.get("RAW_SE_URL", "").strip()
+    if not url:
+        return None
+    return _download_raw_video(url)  # 同じダウンロードロジックを流用
 
 
 def _read_srt_events(subtitle_path: str) -> list[tuple[float, float, str]]:

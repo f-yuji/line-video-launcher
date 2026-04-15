@@ -67,3 +67,7 @@ THUMBNAIL_DIR = os.environ.get("THUMBNAIL_DIR", "thumbnails")
 # Supabase Storage バケット名（デフォルト: videos）
 SUPABASE_STORAGE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "videos")
 HOOK_IMAGE_SECONDS = float(os.environ.get("HOOK_IMAGE_SECONDS", "3.6"))
+
+# 素材動画（本番環境用: raw/ が空の場合にここからダウンロード）
+RAW_VIDEO_URL = os.environ.get("RAW_VIDEO_URL", "")
+RAW_SE_URL = os.environ.get("RAW_SE_URL", "")

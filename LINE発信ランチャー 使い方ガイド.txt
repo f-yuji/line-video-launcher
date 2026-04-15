@@ -147,5 +147,9 @@ python local_generate.py
 
 git status
 git add .
-git commit -m "内容修正"
+git commit -m ""
 git push -u origin main
+
+https://line-video-launcher.onrender.com
+
+https://heterozygotic-paityn-bogglingly.ngrok-free.dev/callback

@@ -43,3 +43,8 @@ services:
         sync: false
       - key: YOUTUBE_REFRESH_TOKEN
         sync: false
+      # 素材動画 URL（Supabase Storage の公開 URL）
+      - key: RAW_VIDEO_URL
+        sync: false
+      - key: RAW_SE_URL
+        sync: false
