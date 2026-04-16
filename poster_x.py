@@ -7,6 +7,7 @@ from utils import setup_logger
 
 logger = setup_logger("poster_x")
 _X_HASHTAG_LIMIT = 3
+_X_REPLY_LIMIT = 280
 
 
 def _get_client():
@@ -79,6 +80,27 @@ def post_to_x(post_id: str, video_path: str, text: str) -> dict:
     }
 
 
+def post_reply_thread(root_tweet_id: str, body_text: str) -> list[str]:
+    chunks = _split_reply_chunks(body_text, _X_REPLY_LIMIT)
+    if not chunks:
+        return []
+
+    client = _get_client()
+    reply_ids: list[str] = []
+    parent_id = root_tweet_id
+
+    for chunk in chunks:
+        response = client.create_tweet(
+            text=chunk,
+            in_reply_to_tweet_id=parent_id,
+        )
+        parent_id = response.data["id"]
+        reply_ids.append(parent_id)
+
+    logger.info(f"[post_reply_thread] root={root_tweet_id} replies={len(reply_ids)}")
+    return reply_ids
+
+
 def build_x_post_text(text: str, hashtags: str = "") -> str:
     base = (text or "").strip()
     tags = _limit_hashtags(hashtags, _X_HASHTAG_LIMIT)
@@ -92,3 +114,63 @@ def build_x_post_text(text: str, hashtags: str = "") -> str:
 def _limit_hashtags(hashtags: str, limit: int) -> str:
     parts = [part.strip() for part in (hashtags or "").split() if part.strip()]
     return " ".join(parts[:limit])
+
+
+def _split_reply_chunks(text: str, limit: int) -> list[str]:
+    normalized = (text or "").replace("\r\n", "\n").strip()
+    if not normalized:
+        return []
+
+    paragraphs = [part.strip() for part in normalized.split("\n\n") if part.strip()]
+    if not paragraphs:
+        paragraphs = [normalized]
+
+    chunks: list[str] = []
+    current = ""
+
+    for paragraph in paragraphs:
+        candidate = paragraph if not current else f"{current}\n\n{paragraph}"
+        if len(candidate) <= limit:
+            current = candidate
+            continue
+
+        if current:
+            chunks.append(current)
+            current = ""
+
+        if len(paragraph) <= limit:
+            current = paragraph
+            continue
+
+        chunks.extend(_split_long_text(paragraph, limit))
+
+    if current:
+        chunks.append(current)
+
+    return chunks
+
+
+def _split_long_text(text: str, limit: int) -> list[str]:
+    parts: list[str] = []
+    remaining = text.strip()
+
+    while len(remaining) > limit:
+        split_at = max(
+            remaining.rfind("。", 0, limit),
+            remaining.rfind("！", 0, limit),
+            remaining.rfind("？", 0, limit),
+            remaining.rfind("\n", 0, limit),
+            remaining.rfind(" ", 0, limit),
+        )
+        if split_at <= 0:
+            split_at = limit
+        else:
+            split_at += 1
+
+        parts.append(remaining[:split_at].strip())
+        remaining = remaining[split_at:].strip()
+
+    if remaining:
+        parts.append(remaining)
+
+    return parts

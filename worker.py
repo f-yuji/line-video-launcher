@@ -153,6 +153,13 @@ def _run_posting(post: dict) -> None:
             video_path=post["video_path"],
             text=x_post_text,
         )
+        try:
+            poster_x.post_reply_thread(
+                root_tweet_id=x_result["tweet_id"],
+                body_text=post.get("body_text", ""),
+            )
+        except Exception as reply_error:
+            logger.warning(f"[worker] [{post_id}] X reply thread failed: {reply_error}")
         db.update_platform_statuses(
             post_id,
             platform_status_x=f"posted:{x_result['tweet_id']}",
