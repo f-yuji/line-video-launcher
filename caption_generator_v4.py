@@ -155,7 +155,8 @@ def _parse_caption_output(raw: str) -> CaptionResult:
     generated_hashtags = _extract("HASHTAGS")
     final_hashtags = _merge_hashtags(generated_hashtags)
     formatted_body = _format_body_text(_extract("BODY"))
-    formatted_x = formatted_body
+    raw_x = _extract("X")
+    formatted_x = _format_social_text(raw_x) if raw_x else _format_social_text(formatted_body)
     formatted_youtube = _format_social_text(_extract("YOUTUBE"))
     formatted_instagram = _format_social_text(_extract("INSTAGRAM"))
     formatted_tiktok = formatted_instagram
