@@ -1,3 +1,4 @@
+import os
 import requests
 import subprocess
 
@@ -7,6 +8,7 @@ from utils import audio_path_for, setup_logger
 logger = setup_logger("voice_generator_v2")
 
 _API_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+_VOICE_VOLUME_MULTIPLIER = float(os.environ.get("VOICE_VOLUME_MULTIPLIER", "1.25"))
 
 
 def _format_text_for_tts(text: str) -> str:
@@ -67,6 +69,9 @@ def generate_voice(post_id: str, text: str) -> str:
 
     if abs(config.VOICE_PLAYBACK_SPEED - 1.0) > 0.001:
         _adjust_playback_speed(out_path, config.VOICE_PLAYBACK_SPEED)
+
+    if abs(_VOICE_VOLUME_MULTIPLIER - 1.0) > 0.001:
+        _adjust_volume(out_path, _VOICE_VOLUME_MULTIPLIER)
 
     if config.END_PADDING_SECONDS > 0:
         _add_tail_silence(out_path, config.END_PADDING_SECONDS)
@@ -167,6 +172,30 @@ def _add_tail_silence(audio_path: str, silence_seconds: float) -> None:
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg tail silence failed: {result.stderr[-500:]}")
+
+    import os
+    os.replace(temp_path, audio_path)
+
+
+def _adjust_volume(audio_path: str, volume_multiplier: float) -> None:
+    temp_path = f"{audio_path}.volume.mp3"
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        audio_path,
+        "-filter:a",
+        f"volume={volume_multiplier:.3f}",
+        "-c:a",
+        "libmp3lame",
+        "-q:a",
+        "2",
+        temp_path,
+    ]
+    logger.info(f"[generate_voice] adjusting volume to {volume_multiplier:.3f}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg volume failed: {result.stderr[-500:]}")
 
     import os
     os.replace(temp_path, audio_path)

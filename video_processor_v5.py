@@ -11,6 +11,7 @@ logger = setup_logger("video_processor_v5")
 
 OUTPUT_WIDTH = 1080
 OUTPUT_HEIGHT = 1920
+_BGM_VOLUME = float(os.environ.get("BGM_VOLUME_MULTIPLIER", "0.12"))
 
 _SUBTITLE_STYLE = (
     "FontName=Noto Sans CJK JP,"
@@ -100,6 +101,7 @@ def process_video(
     cta_ass_path = None if use_cta_image else _create_end_cta_ass(post_id, subtitle_path, audio_duration)
     overlay_ass_path = _merge_ass_overlays(post_id, hook_ass_path, cta_ass_path)
     subtitle_events = _read_srt_events(subtitle_path)
+    bgm_path = _find_bgm_path()
     se_path = _find_se_path()
 
     logger.info(
@@ -117,6 +119,7 @@ def process_video(
         hook_image_path=hook_image_path if use_hook_image else None,
         cta_image_path=cta_image_path if use_cta_image else None,
         subtitle_events=subtitle_events,
+        bgm_path=bgm_path,
         se_path=se_path,
     )
     _run_ffmpeg(cmd)
@@ -135,6 +138,7 @@ def _build_ffmpeg_command(
     hook_image_path: str | None,
     cta_image_path: str | None,
     subtitle_events: list[tuple[float, float, str]],
+    bgm_path: str | None,
     se_path: str | None,
 ) -> list[str]:
     escaped_sub = subtitle_path.replace("\\", "/").replace(":", "\\:")
@@ -188,6 +192,19 @@ def _build_ffmpeg_command(
     else:
         filter_parts.append(f"{current_video}null[vout]")
 
+    if bgm_path:
+        cmd.extend(["-stream_loop", "-1", "-i", bgm_path])
+        filter_parts.append(
+            f"[{next_input_index}:a]atrim=0:{audio_duration:.3f},asetpts=N/SR/TB,"
+            f"volume={_BGM_VOLUME:.3f}[bgm]"
+        )
+        filter_parts.append(f"[1:a][bgm]amix=inputs=2:duration=first:normalize=0[amixbgm]")
+        audio_map = "[amixbgm]"
+        logger.info(f"[process_video] BGM enabled path={bgm_path} volume={_BGM_VOLUME:.3f}")
+        next_input_index += 1
+    else:
+        logger.info("[process_video] BGM skipped")
+
     if se_path and subtitle_events:
         cmd.extend(["-stream_loop", "-1", "-i", se_path])
         first_start = subtitle_events[0][0]
@@ -197,7 +214,7 @@ def _build_ffmpeg_command(
             f"afade=t=out:st=0.30:d=0.15,"
             f"adelay={delay}|{delay},volume=0.65,apad[se0]"
         )
-        filter_parts.append("[1:a][se0]amix=inputs=2:duration=first:normalize=0[aout]")
+        filter_parts.append(f"{audio_map}[se0]amix=inputs=2:duration=first:normalize=0[aout]")
         audio_map = "[aout]"
         logger.info(f"[process_video] SE timing={round(first_start, 3)}")
     else:
@@ -217,7 +234,10 @@ def _build_ffmpeg_command(
 
 
 def _find_se_path() -> str | None:
-    files = sorted(glob.glob(os.path.join(config.RAW_DIR, "*.mp3")))
+    patterns = ("se*.mp3", "se*.wav", "se*.m4a", "se*.aac")
+    files: list[str] = []
+    for pattern in patterns:
+        files.extend(sorted(glob.glob(os.path.join(config.RAW_DIR, pattern))))
     if files:
         return files[0]
 
@@ -225,6 +245,20 @@ def _find_se_path() -> str | None:
     if not url:
         return None
     return _download_raw_video(url)  # 同じダウンロードロジックを流用
+
+
+def _find_bgm_path() -> str | None:
+    patterns = ("bgm*.mp3", "bgm*.wav", "bgm*.m4a", "bgm*.aac")
+    files: list[str] = []
+    for pattern in patterns:
+        files.extend(sorted(glob.glob(os.path.join(config.RAW_DIR, pattern))))
+    if files:
+        return files[0]
+
+    url = os.environ.get("RAW_BGM_URL", "").strip()
+    if not url:
+        return None
+    return _download_raw_video(url)
 
 
 def _read_srt_events(subtitle_path: str) -> list[tuple[float, float, str]]:
