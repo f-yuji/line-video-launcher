@@ -6,6 +6,7 @@ import config
 from utils import setup_logger
 
 logger = setup_logger("poster_x")
+_X_HASHTAG_LIMIT = 3
 
 
 def _get_client():
@@ -76,3 +77,18 @@ def post_to_x(post_id: str, video_path: str, text: str) -> dict:
         "url": url,
         "media_id": media_id,
     }
+
+
+def build_x_post_text(text: str, hashtags: str = "") -> str:
+    base = (text or "").strip()
+    tags = _limit_hashtags(hashtags, _X_HASHTAG_LIMIT)
+    if not tags:
+        return base
+    if not base:
+        return tags
+    return f"{base}\n\n{tags}"
+
+
+def _limit_hashtags(hashtags: str, limit: int) -> str:
+    parts = [part.strip() for part in (hashtags or "").split() if part.strip()]
+    return " ".join(parts[:limit])

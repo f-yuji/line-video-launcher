@@ -144,10 +144,14 @@ def _run_posting(post: dict) -> None:
     try:
         # X 投稿
         logger.info(f"[worker] [{post_id}] posting to X")
+        x_post_text = poster_x.build_x_post_text(
+            post.get("x_text", ""),
+            post.get("hashtags", ""),
+        )
         x_result = poster_x.post_to_x(
             post_id=post_id,
             video_path=post["video_path"],
-            text=post["x_text"],
+            text=x_post_text,
         )
         db.update_platform_statuses(
             post_id,
