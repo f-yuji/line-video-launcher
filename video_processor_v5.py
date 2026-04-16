@@ -161,7 +161,7 @@ def _build_ffmpeg_command(
 
     current_video = "[vbase]"
     next_input_index = 2
-    audio_map = "1:a"
+    audio_label = "1:a"
 
     if hook_image_path:
         cmd.extend(["-loop", "1", "-i", hook_image_path])
@@ -198,8 +198,10 @@ def _build_ffmpeg_command(
             f"[{next_input_index}:a]atrim=0:{audio_duration:.3f},asetpts=N/SR/TB,"
             f"volume={_BGM_VOLUME:.3f}[bgm]"
         )
-        filter_parts.append(f"[1:a][bgm]amix=inputs=2:duration=first:normalize=0[amixbgm]")
-        audio_map = "[amixbgm]"
+        filter_parts.append(
+            f"[{audio_label}][bgm]amix=inputs=2:duration=first:normalize=0[amixbgm]"
+        )
+        audio_label = "amixbgm"
         logger.info(f"[process_video] BGM enabled path={bgm_path} volume={_BGM_VOLUME:.3f}")
         next_input_index += 1
     else:
@@ -214,8 +216,10 @@ def _build_ffmpeg_command(
             f"afade=t=out:st=0.30:d=0.15,"
             f"adelay={delay}|{delay},volume=0.65,apad[se0]"
         )
-        filter_parts.append(f"{audio_map}[se0]amix=inputs=2:duration=first:normalize=0[aout]")
-        audio_map = "[aout]"
+        filter_parts.append(
+            f"[{audio_label}][se0]amix=inputs=2:duration=first:normalize=0[aout]"
+        )
+        audio_label = "aout"
         logger.info(f"[process_video] SE timing={round(first_start, 3)}")
     else:
         logger.info("[process_video] SE skipped")
@@ -224,7 +228,7 @@ def _build_ffmpeg_command(
         "-t", str(audio_duration),
         "-filter_complex", ";".join(filter_parts),
         "-map", "[vout]",
-        "-map", audio_map,
+        "-map", f"[{audio_label}]",
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
         "-c:a", "aac", "-b:a", "192k",
         "-shortest",
