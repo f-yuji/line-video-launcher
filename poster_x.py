@@ -67,7 +67,11 @@ def post_to_x(post_id: str, video_path: str, text: str) -> dict:
 
     # ツイート作成
     client = _get_client()
-    response = client.create_tweet(text=text, media_ids=[media_id])
+    response = client.create_tweet(
+        text=text,
+        media_ids=[media_id],
+        user_auth=True,
+    )
     tweet_id = response.data["id"]
     url = f"https://x.com/i/web/status/{tweet_id}"
     logger.info(f"[post_to_x] posted tweet_id={tweet_id}")
@@ -93,6 +97,7 @@ def post_reply_thread(root_tweet_id: str, body_text: str) -> list[str]:
         response = client.create_tweet(
             text=chunk,
             in_reply_to_tweet_id=parent_id,
+            user_auth=True,
         )
         parent_id = response.data["id"]
         reply_ids.append(parent_id)
